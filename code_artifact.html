@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>상일초 교실 랜덤 발표자 뽑기</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Canvas Confetti for celebration effects -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts: Jua & Pretendard for friendly classroom look -->
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background: linear-gradient(135deg, #f0f4ff 0%, #eef2f6 100%);
+            user-select: none;
+        }
+        .jua-font {
+            font-family: 'Jua', sans-serif;
+        }
+        /* Card flip and shuffle animations */
+        @keyframes bounce-short {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-short {
+            animation: bounce-short 0.5s ease-in-out infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 35px rgba(59, 130, 246, 0.8); }
+        }
+        .glow-effect {
+            animation: pulse-glow 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-slate-800 overflow-x-hidden">
+
+    <header class="w-full py-5 bg-white/80 backdrop-blur-md shadow-sm border-b border-slate-100 px-6 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <span class="text-3xl">🎯</span>
+            <h1 class="jua-font text-2xl md:text-3xl text-indigo-600 tracking-wide">오늘의 주인공은?</h1>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span id="remaining-counter" class="text-sm md:text-base font-bold bg-indigo-50 text-indigo-700 px-4 py-2 rounded-full border border-indigo-100">
+                남은 인원: <strong id="left-count">25</strong> / 25명
+            </span>
+            <button onclick="resetAll()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2 rounded-xl text-sm md:text-base transition-all flex items-center space-x-1 shadow-sm">
+                <span>🔄 전체 초기화</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow container mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center max-w-7xl">
+        
+        <!-- Left / Top: Number Cards Grid (1 to 25) -->
+        <section class="lg:col-span-7 bg-white/90 backdrop-blur-sm rounded-3xl p-6 shadow-xl border border-slate-100 flex flex-col justify-between">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="jua-font text-xl text-slate-700">전체 번호 현황</h2>
+                <span class="text-xs text-slate-400">클릭하여 개별 제외/포함 토글 가능</span>
+            </div>
+            
+            <!-- Grid Container -->
+            <div id="cards-grid" class="grid grid-cols-5 gap-3 md:gap-4 py-2">
+                <!-- Dynamically injected via JavaScript -->
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-slate-100 flex justify-between text-xs text-slate-500 font-medium">
+                <div class="flex items-center space-x-2">
+                    <span class="w-3 h-3 rounded-full bg-indigo-600 inline-block"></span>
+                    <span>대기 중</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="w-3 h-3 rounded-full bg-amber-400 inline-block"></span>
+                    <span>방금 뽑힘</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="w-3 h-3 rounded-full bg-slate-300 inline-block"></span>
+                    <span>발표 완료 (제외)</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right / Bottom: Random Selector & Highlight Display -->
+        <section class="lg:col-span-5 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-900 to-slate-900 rounded-3xl p-8 shadow-2xl text-white relative overflow-hidden min-h-[420px] lg:min-h-[500px]">
+            <!-- Background ambient glow -->
+            <div class="absolute -top-24 -right-24 w-72 h-72 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -left-24 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            <!-- Main Display Area -->
+            <div class="relative z-10 flex flex-col items-center justify-center text-center my-auto w-full">
+                <span id="draw-status-label" class="jua-font text-indigo-300 text-lg md:text-xl mb-4 tracking-widest uppercase">
+                    행운의 주인공은 누구?
+                </span>
+                
+                <!-- Big Number Highlight Box -->
+                <div id="highlight-box" class="w-48 h-48 md:w-56 md:h-56 bg-white/10 border-4 border-white/20 rounded-3xl flex items-center justify-center backdrop-blur-md shadow-2xl mb-8 transition-all transform duration-300">
+                    <span id="highlight-number" class="jua-font text-7xl md:text-9xl text-white drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]">
+                        ?
+                    </span>
+                </div>
+
+                <!-- Draw Button -->
+                <button id="draw-btn" onclick="startDraw()" class="w-full max-w-xs bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-900 jua-font text-2xl md:text-3xl py-4 px-8 rounded-2xl shadow-xl transform active:scale-95 transition-all glow-effect flex items-center justify-center space-x-2">
+                    <span>🎲 랜덤 뽑기!</span>
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="w-full py-4 text-center text-slate-400 text-xs md:text-sm">
+        초등학교 및 중학교 교실 수업 환경 최적화 웹 애플리케이션
+    </footer>
+
+    <script>
+        // Total number of students in the classroom
+        const TOTAL_STUDENTS = 25;
+        
+        // State management
+        let students = [];
+        let isDrawing = false;
+
+        // Initialize state on load
+        function initApp() {
+            students = [];
+            for (let i = 1; i <= TOTAL_STUDENTS; i++) {
+                students.push({
+                    id: i,
+                    status: 'available' // 'available', 'selected', 'excluded'
+                });
+            }
+            renderGrid();
+            updateCounter();
+            document.getElementById('highlight-number').innerText = '?';
+            document.getElementById('draw-status-label').innerText = '행운의 주인공은 누구?';
+            document.getElementById('highlight-box').className = "w-48 h-48 md:w-56 md:h-56 bg-white/10 border-4 border-white/20 rounded-3xl flex items-center justify-center backdrop-blur-md shadow-2xl mb-8 transition-all transform duration-300";
+        }
+
+        // Render the 1-25 number cards grid
+        function renderGrid() {
+            const gridContainer = document.getElementById('cards-grid');
+            gridContainer.innerHTML = '';
+
+            students.forEach(student => {
+                const card = document.createElement('div');
+                card.id = `card-${student.id}`;
+                
+                let baseClasses = "aspect-square rounded-2xl flex flex-col items-center justify-center jua-font text-2xl md:text-3xl transition-all duration-300 cursor-pointer shadow-sm border";
+                
+                if (student.status === 'available') {
+                    baseClasses += " bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:scale-105";
+                } else if (student.status === 'selected') {
+                    baseClasses += " bg-amber-400 border-amber-500 text-slate-900 scale-105 shadow-md ring-4 ring-amber-300/50 animate-bounce-short";
+                } else {
+                    // excluded / finished
+                    baseClasses += " bg-slate-200 border-slate-300 text-slate-400 opacity-75 line-through";
+                }
+
+                card.className = baseClasses;
+                card.innerHTML = `<span>${student.id}</span>`;
+                
+                // Allow manual toggle on click
+                card.onclick = () => toggleStudentStatus(student.id);
+
+                gridContainer.appendChild(card);
+            });
+        }
+
+        // Update remaining count text
+        function updateCounter() {
+            const availableCount = students.filter(s => s.status !== 'excluded').length;
+            document.getElementById('left-count').innerText = availableCount;
+        }
+
+        // Manual toggle status for individual card
+        function toggleStudentStatus(id) {
+            if (isDrawing) return;
+            const student = students.find(s => s.id === id);
+            if (!student) return;
+
+            if (student.status === 'available' || student.status === 'selected') {
+                student.status = 'excluded';
+            } else {
+                student.status = 'available';
+            }
+            renderGrid();
+            updateCounter();
+        }
+
+        // Web Audio API Sound Effects Generator
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playBeepSound() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(440, audioCtx.currentTime); // A4 note
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function playTaDaSound() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const now = audioCtx.currentTime;
+            
+            // Chord notes for celebration
+            [523.25, 659.25, 783.99, 1046.50].forEach((freq, index) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, now + index * 0.08);
+                gain.gain.setValueAtTime(0.15, now + index * 0.08);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.6);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now + index * 0.08);
+                osc.stop(now + index * 0.6);
+            });
+        }
+
+        // Start Random Draw Animation
+        function startDraw() {
+            if (isDrawing) return;
+
+            // Get available candidates (not yet excluded)
+            const availableStudents = students.filter(s => s.status !== 'excluded');
+            
+            if (availableStudents.length === 0) {
+                alertBox("모든 인원이 발표를 마쳤습니다! 초기화 후 다시 시도해 주세요.");
+                return;
+            }
+
+            isDrawing = true;
+            const drawBtn = document.getElementById('draw-btn');
+            drawBtn.disabled = true;
+            drawBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            document.getElementById('draw-status-label').innerText = '번호를 섞고 있습니다... 🔄';
+            
+            // Reset previous selected states in grid back to normal (or excluded if needed, but we keep excluded as is)
+            students.forEach(s => {
+                if (s.status === 'selected') s.status = 'available';
+            });
+
+            let shuffleCount = 0;
+            const maxShuffles = 22; // Number of flashes before stopping
+            let delay = 50;
+
+            function shuffleStep() {
+                // Pick a random available student for animation visual
+                const randomIndex = Math.floor(Math.random() * availableStudents.length);
+                const currentCandidate = availableStudents[randomIndex];
+
+                // Display flashing number
+                const highlightNumEl = document.getElementById('highlight-number');
+                highlightNumEl.innerText = currentCandidate.id;
+                playBeepSound();
+
+                shuffleCount++;
+                if (shuffleCount < maxShuffles) {
+                    delay += 15; // Slow down gradually
+                    setTimeout(shuffleStep, delay);
+                } else {
+                    // Final winner selection
+                    finalizeWinner(availableStudents);
+                }
+            }
+
+            shuffleStep();
+        }
+
+        // Finalize winner
+        function finalizeWinner(availableStudents) {
+            // Choose actual winner randomly from available
+            const finalIndex = Math.floor(Math.random() * availableStudents.length);
+            const winner = availableStudents[finalIndex];
+
+            // Update student statuses
+            students.forEach(s => {
+                if (s.id === winner.id) {
+                    s.status = 'selected';
+                }
+            });
+
+            // Update UI
+            const highlightNumEl = document.getElementById('highlight-number');
+            highlightNumEl.innerText = winner.id;
+
+            const highlightBox = document.getElementById('highlight-box');
+            highlightBox.className = "w-48 h-48 md:w-56 md:h-56 bg-gradient-to-tr from-amber-400 to-yellow-300 border-4 border-white rounded-3xl flex items-center justify-center backdrop-blur-md shadow-2xl mb-8 transition-all transform scale-110 duration-300 ring-8 ring-amber-400/40";
+            
+            document.getElementById('draw-status-label').innerText = `🎉 당첨! ${winner.id}번 발표자! 🎉`;
+
+            renderGrid();
+            updateCounter();
+            playTaDaSound();
+            triggerConfetti();
+
+            // After a short delay, change selected to excluded so they won't be picked again automatically
+            setTimeout(() => {
+                const target = students.find(s => s.id === winner.id);
+                if (target && target.status === 'selected') {
+                    target.status = 'excluded';
+                    renderGrid();
+                    updateCounter();
+                }
+                
+                // Re-enable draw button
+                const drawBtn = document.getElementById('draw-btn');
+                drawBtn.disabled = false;
+                drawBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                isDrawing = false;
+            }, 1200);
+        }
+
+        // Confetti effect celebration
+        function triggerConfetti() {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        // Reset all function
+        function resetAll() {
+            if (isDrawing) return;
+            initApp();
+        }
+
+        // Custom friendly message modal instead of alert()
+        function alertBox(message) {
+            // Simple notification banner or styled confirm replacement
+            const label = document.getElementById('draw-status-label');
+            const originalText = label.innerText;
+            label.innerText = message;
+            label.classList.add('text-amber-300');
+            setTimeout(() => {
+                label.innerText = originalText;
+                label.classList.remove('text-amber-300');
+            }, 3000);
+        }
+
+        // Initial setup on window load
+        window.onload = function() {
+            initApp();
+        };
+    </script>
+</body>
+</html>
